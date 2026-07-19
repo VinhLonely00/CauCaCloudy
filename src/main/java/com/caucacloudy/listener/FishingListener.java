@@ -14,8 +14,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerFishEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemHeldEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitRunnable;
@@ -33,6 +36,7 @@ public class FishingListener implements Listener {
     private final CauCaCloudy plugin;
     private final Random random = new Random();
     
+    // Sử dụng Set hoặc Map để đánh dấu người chơi đang trong trạng thái nhận thưởng nhằm tránh lặp đè Event
     private final Map<UUID, Boolean> isWinningClick = new ConcurrentHashMap<>();
     private final Map<UUID, FishingGameSession> localActiveGames = new ConcurrentHashMap<>();
 
@@ -48,6 +52,7 @@ public class FishingListener implements Listener {
         
         if (!cfg.isMinigameEnabled()) return;
 
+        // Nếu đang trong luồng xử lý phát thưởng, bỏ qua hoàn toàn để tránh xung đột loop
         if (isWinningClick.getOrDefault(playerId, false)) {
             return; 
         }
@@ -73,7 +78,6 @@ public class FishingListener implements Listener {
 
             if (!localActiveGames.containsKey(playerId)) {
                 FishingGameSession gameSession;
-                
                 int rand = ThreadLocalRandom.current().nextInt(4);
 
                 if (rand == 0) {
@@ -107,14 +111,15 @@ public class FishingListener implements Listener {
             return;
         }
 
-        if (event.getState() == PlayerFishEvent.State.CAUGHT_FISH || event.getState() == PlayerFishEvent.State.REEL_IN) {
+        // Chặn người chơi tự thu cần về bằng cách thông thường khi game đang chạy
+        if (event.getState() == PlayerFishEvent.State.CAUGHT_FISH || event.getState() == PlayerFishEvent.State.REEL_IN || event.getState() == PlayerFishEvent.State.IN_GROUND) {
             if (localActiveGames.containsKey(playerId)) {
                 event.setCancelled(true);
             }
         }
     }
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.LOWEST)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
         if (event.getAction().name().contains("RIGHT")) {
@@ -123,22 +128,54 @@ public class FishingListener implements Listener {
                 
                 if (localActiveGames.containsKey(player.getUniqueId())) {
                     event.setCancelled(true); 
+                    // Gọi sang manager xử lý input tập trung
                     plugin.getFishingManager().handlePlayerClick(player);
                 }
             }
         }
     }
 
+    // --- BỘ LỌC NGĂN CHẶN MEMORY LEAK (RÒ RỈ BỘ NHỚ) ---
+
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
+        forceFailSession(event.getPlayer(), "Bạn đã rời trò chơi khi đang câu cá.");
+    }
+
+    @EventHandler
+    public void onPlayerDeath(PlayerDeathEvent event) {
+        forceFailSession(event.getEntity(), "Bạn đã tử trận khi đang câu cá!");
+    }
+
+    @EventHandler
+    public void onSlotChange(PlayerItemHeldEvent event) {
+        // Nếu người chơi chuyển đổi item cầm trên tay, hủy lượt chơi cũ
         Player player = event.getPlayer();
+        if (localActiveGames.containsKey(player.getUniqueId())) {
+            forceFailSession(player, "Hủy câu do thay đổi vật phẩm trên tay.");
+        }
+    }
+
+    @EventHandler
+    public void onOpenInventory(InventoryOpenEvent event) {
+        if (event.getPlayer() instanceof Player) {
+            Player player = (Player) event.getPlayer();
+            if (localActiveGames.containsKey(player.getUniqueId())) {
+                forceFailSession(player, "Hủy câu do mở kho đồ.");
+            }
+        }
+    }
+
+    private void forceFailSession(Player player, String reason) {
         UUID playerId = player.getUniqueId();
         FishingGameSession session = localActiveGames.remove(playerId);
         if (session != null) {
             session.stop();
+            // Lấy thực thể Hook (nếu có) để xóa bỏ hoàn toàn khỏi thế giới
+            plugin.getFishingManager().removeSession(player);
+            isWinningClick.remove(playerId);
+            player.sendActionBar(ChatColor.RED + "✕ TRÒ CHƠI BỊ HỦY ✕");
         }
-        plugin.getFishingManager().removeSession(player);
-        isWinningClick.remove(playerId);
     }
 
     private interface FishingGameSession {
@@ -157,19 +194,21 @@ public class FishingListener implements Listener {
 
         if (hook != null && hook.isValid()) {
             isWinningClick.put(playerId, true);
-            
-            Item caughtEntity = hook.getWorld().dropItem(hook.getLocation(), new ItemStack(Material.COD));
-            
-            if (caughtEntity.isValid()) {
-                ItemStack finalFishItem = caughtEntity.getItemStack();
-                HashMap<Integer, ItemStack> leftOver = player.getInventory().addItem(finalFishItem);
-                for (ItemStack drop : leftOver.values()) {
-                    player.getWorld().dropItemNaturally(player.getLocation(), drop);
+            try {
+                Item caughtEntity = hook.getWorld().dropItem(hook.getLocation(), new ItemStack(Material.COD));
+                if (caughtEntity.isValid()) {
+                    ItemStack finalFishItem = caughtEntity.getItemStack();
+                    HashMap<Integer, ItemStack> leftOver = player.getInventory().addItem(finalFishItem);
+                    for (ItemStack drop : leftOver.values()) {
+                        player.getWorld().dropItemNaturally(player.getLocation(), drop);
+                    }
+                    caughtEntity.remove();
                 }
-                caughtEntity.remove();
+                hook.remove(); 
+            } finally {
+                // Đặt vào khối block finally để đảm bảo dù có lỗi drop item xảy ra, flag vẫn được gỡ bỏ tránh kẹt người chơi
+                isWinningClick.remove(playerId);
             }
-            hook.remove(); 
-            isWinningClick.remove(playerId);
         }
     }
 
@@ -189,6 +228,8 @@ public class FishingListener implements Listener {
         localActiveGames.remove(player.getUniqueId());
         plugin.getFishingManager().removeSession(player);
     }
+
+    // --- CÁC CLASS MINIGAME INNER ĐƯỢC TỐI ƯU HÓA ---
 
     private class BarMinigame extends BukkitRunnable implements FishingGameSession {
         private final Player player;
@@ -223,7 +264,7 @@ public class FishingListener implements Listener {
             }
 
             cursorPos += direction;
-            if (cursorPos >= barLength || cursorPos <= 0) {
+            if (cursorPos >= barLength - 1 || cursorPos <= 0) {
                 direction *= -1;
             }
 
@@ -422,15 +463,18 @@ public class FishingListener implements Listener {
 
             ticksCount += gravityTicks;
 
+            // Cơ chế trọng lực tự nhiên: Thanh vợt tự động tụt xuống theo thời gian
             if (ticksCount % 3 == 0 && basketStart > 0) {
                 basketStart--;
             }
 
+            // Cá bơi ngẫu nhiên sang hai bên vị trí mục tiêu mới
             if (ticksCount % fishMoveTicks == 0) {
                 int moveRange = ThreadLocalRandom.current().nextInt(-4, 5);
                 targetFishPos = Math.max(0, Math.min(barLength - 1, targetFishPos + moveRange));
             }
 
+            // Di chuyển cá tiệm cận mượt mà về phía mục tiêu bơi
             if (fishPos < targetFishPos) fishPos++;
             else if (fishPos > targetFishPos) fishPos--;
 
@@ -492,6 +536,7 @@ public class FishingListener implements Listener {
         public void onInput() {
             if (!isActive) return;
             int maxBasketStart = barLength - basketSize;
+            // Mỗi lần click, tăng tọa độ basketStart để đẩy vợt "nhảy" lên
             basketStart = Math.min(maxBasketStart, basketStart + jumpStrength);
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.5f, 1.5f);
         }
@@ -575,7 +620,7 @@ public class FishingListener implements Listener {
             StringBuilder renderBar = new StringBuilder();
             
             renderBar.append(ChatColor.RED).append(ChatColor.BOLD).append("⏱ ").append(String.format("%.1f", timeLimitTicks / 20.0)).append("s  ");
-            renderBar.append(ChatColor.YELLOW).append(ChatColor.BOLD).append("GÌ CẦN: ")
+            renderBar.append(ChatColor.YELLOW).append(ChatColor.BOLD).append("GHÌ CẦN: ")
                      .append(ChatColor.GREEN).append(clickCount).append(ChatColor.WHITE).append("/").append(requiredClicks).append("  ");
 
             renderBar.append(ChatColor.DARK_GRAY).append("[");
