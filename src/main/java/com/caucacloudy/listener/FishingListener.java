@@ -48,12 +48,10 @@ public class FishingListener implements Listener {
         
         if (!cfg.isMinigameEnabled()) return;
 
-        // Tránh vòng lặp vô hạn khi chính plugin thu cần ăn cá
         if (isWinningClick.getOrDefault(playerId, false)) {
             return; 
         }
 
-        // 1. Rút ngắn thời gian chờ cá cắn câu
         if (event.getState() == PlayerFishEvent.State.FISHING) {
             FishHook hook = event.getHook();
             if (hook != null) {
@@ -65,12 +63,10 @@ public class FishingListener implements Listener {
             return;
         }
 
-        // 2. Cá vừa cắn câu -> Khởi chạy minigame
         if (event.getState() == PlayerFishEvent.State.BITE) {
             FishHook hook = event.getHook();
             if (hook == null || hook.getLocation() == null) return;
             
-            // Hiệu ứng môi trường
             FishingEnvironmentManager.FishingArea area = FishingEnvironmentManager.getArea(hook.getLocation());
             hook.getWorld().spawnParticle(FishingEnvironmentManager.getParticle(area), hook.getLocation(), 20, 0.1, 0.1, 0.1, 0.01);
             hook.getWorld().playSound(hook.getLocation(), FishingEnvironmentManager.getBiteSound(area), 1.0F, 1.0F);
@@ -78,7 +74,6 @@ public class FishingListener implements Listener {
             if (!localActiveGames.containsKey(playerId)) {
                 FishingGameSession gameSession;
                 
-                // Sử dụng cơ chế random chia đều an toàn để tránh gọi thiếu method từ ConfigManager cũ
                 int rand = ThreadLocalRandom.current().nextInt(4);
 
                 if (rand == 0) {
@@ -95,7 +90,7 @@ public class FishingListener implements Listener {
                 
                 plugin.getFishingManager().registerSession(player, new FishingManager.FishingGameSessionBridge() {
                     @Override
-                    public void onInput() {
+                    public void executeInput() {
                         FishingGameSession session = localActiveGames.get(playerId);
                         if (session != null) session.onInput();
                     }
@@ -112,7 +107,6 @@ public class FishingListener implements Listener {
             return;
         }
 
-        // 3. Chặn tương tác thu cần mặc định khi minigame đang chạy
         if (event.getState() == PlayerFishEvent.State.CAUGHT_FISH || event.getState() == PlayerFishEvent.State.REEL_IN) {
             if (localActiveGames.containsKey(playerId)) {
                 event.setCancelled(true);
@@ -164,10 +158,8 @@ public class FishingListener implements Listener {
         if (hook != null && hook.isValid()) {
             isWinningClick.put(playerId, true);
             
-            // Tạo phần thưởng cá rơi ra
             Item caughtEntity = hook.getWorld().dropItem(hook.getLocation(), new ItemStack(Material.COD));
             
-            // Chạy logic nhét thẳng vào túi đồ người chơi bảo mật không bị loot mất
             if (caughtEntity.isValid()) {
                 ItemStack finalFishItem = caughtEntity.getItemStack();
                 HashMap<Integer, ItemStack> leftOver = player.getInventory().addItem(finalFishItem);
@@ -177,7 +169,7 @@ public class FishingListener implements Listener {
                 caughtEntity.remove();
             }
             hook.remove(); 
-            isWinningClick.remove(playerId); // Dọn dẹp sạch sau khi xử lý xong hook
+            isWinningClick.remove(playerId);
         }
     }
 
@@ -198,9 +190,6 @@ public class FishingListener implements Listener {
         plugin.getFishingManager().removeSession(player);
     }
 
-    // =========================================================================
-    // 📊 MINIGAME 1: THANH BAR CHẠY MŨI TÊN
-    // =========================================================================
     private class BarMinigame extends BukkitRunnable implements FishingGameSession {
         private final Player player;
         private final FishHook hook;
@@ -275,9 +264,6 @@ public class FishingListener implements Listener {
         }
     }
 
-    // =========================================================================
-    // 🚥 MINIGAME 2: ĐÈN ĐỎ ĐÈN XANH
-    // =========================================================================
     private class RedGreenMinigame implements FishingGameSession {
         private final Player player;
         private final FishHook hook;
@@ -375,9 +361,6 @@ public class FishingListener implements Listener {
         }
     }
 
-    // =========================================================================
-    // 🐟 MINIGAME 3: GIỮ CÁ TRONG Ô
-    // =========================================================================
     private class KeepFishMinigame extends BukkitRunnable implements FishingGameSession {
         private final Player player;
         private final FishHook hook;
@@ -439,18 +422,15 @@ public class FishingListener implements Listener {
 
             ticksCount += gravityTicks;
 
-            // Thanh vợt tự động tụt dần theo trọng lực
             if (ticksCount % 3 == 0 && basketStart > 0) {
                 basketStart--;
             }
 
-            // Cá AI nhảy ngẫu nhiên vị trí đích
             if (ticksCount % fishMoveTicks == 0) {
                 int moveRange = ThreadLocalRandom.current().nextInt(-4, 5);
                 targetFishPos = Math.max(0, Math.min(barLength - 1, targetFishPos + moveRange));
             }
 
-            // Di chuyển cá tiệm cận mượt tới vị trí đích
             if (fishPos < targetFishPos) fishPos++;
             else if (fishPos > targetFishPos) fishPos--;
 
@@ -512,7 +492,6 @@ public class FishingListener implements Listener {
         public void onInput() {
             if (!isActive) return;
             int maxBasketStart = barLength - basketSize;
-            // Click đẩy thanh basket giật lên trên đầu chuỗi
             basketStart = Math.min(maxBasketStart, basketStart + jumpStrength);
             player.playSound(player.getLocation(), Sound.BLOCK_NOTE_BLOCK_HAT, 0.5f, 1.5f);
         }
@@ -529,9 +508,6 @@ public class FishingListener implements Listener {
         }
     }
 
-    // =========================================================================
-    // ⚡ MINIGAME 4: ĐUA TỐC ĐỘ CLICK
-    // =========================================================================
     private class ClickSpeedMinigame extends BukkitRunnable implements FishingGameSession {
         private final Player player;
         private final FishHook hook;
