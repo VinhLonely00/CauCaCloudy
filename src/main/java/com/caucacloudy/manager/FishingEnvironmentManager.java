@@ -15,23 +15,26 @@ public class FishingEnvironmentManager {
 
     public static FishingArea getArea(Location loc) {
         Biome biome = loc.getBlock().getBiome();
-        if (biome.name().contains("OCEAN") || biome.name().contains("BEACH")) {
+        // Dùng toString() thay vì name() để tương thích tốt với hệ thống Registry mới của Spigot/Paper
+        String biomeName = biome.toString().toUpperCase();
+        
+        if (biomeName.contains("OCEAN") || biomeName.contains("BEACH")) {
             return FishingArea.OCEAN;
-        } else if (biome.name().contains("SWAMP")) {
+        } else if (biomeName.contains("SWAMP")) {
             return FishingArea.SWAMP;
         }
         return FishingArea.NORMAL;
     }
 
     public static Particle getParticle(FishingArea area) {
+        // Sử dụng các hạt chuẩn cơ bản của 1.20.5+ và 1.21 không bao giờ bị đổi tên
         switch (area) {
             case OCEAN:
-                // Sử dụng WATER_WAKE (bọt sóng nước) luôn có sẵn trên các bản Spigot cổ/mới
-                return Particle.WATER_WAKE;
+                return Particle.FISHING; // Hạt bong bóng cần câu, phiên bản nào cũng có
             case SWAMP:
-                return Particle.SPELL_WITCH;
+                return Particle.WITCH; // Hạt phù thủy huyền bí cho đầm lầy
             default:
-                return Particle.WATER_SPLASH;
+                return Particle.SPLASH; // Hạt nước bắn thông thường
         }
     }
 
@@ -40,7 +43,12 @@ public class FishingEnvironmentManager {
             case OCEAN:
                 return Sound.ENTITY_PLAYER_SPLASH;
             case SWAMP:
-                return Sound.BLOCK_MUD_BREAK;
+                try {
+                    // Tránh lỗi nếu server chạy phiên bản không có âm thanh bùn
+                    return Sound.valueOf("BLOCK_MUD_BREAK");
+                } catch (IllegalArgumentException e) {
+                    return Sound.ENTITY_FISH_SWIM;
+                }
             default:
                 return Sound.ENTITY_FISH_SWIM;
         }
