@@ -1,0 +1,12 @@
+name: CauCaCloudy
+version: 1.0.0
+main: com.caucacloudy.CauCaCloudy
+api-version: '1.21' # Giữ nguyên nhánh gốc 1.21 để tương thích 1.21.11
+author: VinhLonely00
+description: Plugin cau ca giai tri mini-game thanh truot doc quyen boi Cloudy!
+
+commands:
+  caucacloudy:
+    description: Lenh quan tri cho plugin CauCaCloudy
+    aliases: [ccc]
+    permission: caucacloudy.admin

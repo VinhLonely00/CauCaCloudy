@@ -1,0 +1,57 @@
+# ====================================================
+#              CAU CA CLOUDY CONFIGURATION
+# ====================================================
+
+fishing-minigame:
+  enabled: true
+  
+  # Thời gian chờ cá cắn câu (Tính bằng giây)
+  min-wait-time: 2
+  max-wait-time: 5
+
+  # 🎲 TỈ LỆ XUẤT HIỆN CỦA TỪNG MINIGAME (Tổng các số nên bằng 100)
+  # Để TẮT HẲN một minigame bất kỳ, bạn chỉ cần đặt tỉ lệ (chance) của trò đó về 0.
+  chance:
+    bar-game: 25          # Trò 1: Thanh cuộn chạy mũi tên (%)
+    red-green-game: 25    # Trò 2: Đèn Đỏ Đèn Xanh (%)
+    keep-fish-game: 25    # Trò 3: Giữ Cá Trong Ô (%)
+    click-speed-game: 25  # Trò 4: Đua Tốc Độ Click (%)
+  
+  # 📊 Cấu hình Minigame 1: Thanh cuộn chạy mũi tên
+  bar-length: 30       # Tổng độ dài thanh trượt
+  green-zone-size: 6   # Độ rộng vùng xanh chiến thắng ở giữa
+  game-speed-ticks: 2  # Tốc độ chạy của mũi tên (số càng nhỏ chạy càng nhanh)
+
+  # 🚥 Cấu hình Minigame 2: Đèn Đỏ Đèn Xanh
+  red-green-game:
+    red-light-ticks: 6     # Thời gian đèn đỏ hiển thị (6 ticks = 0.3 giây)
+    green-light-ticks: 10  # Thời gian đèn xanh hiển thị (10 ticks = 0.5 giây)
+    min-blank-ticks: 16    # Khoảng trống tắt đèn tối thiểu (16 ticks = 0.8 giây)
+    max-blank-ticks: 30    # Khoảng trống tắt đèn tối đa (30 ticks = 1.5 giây)
+    max-turns: 5           # Số lượt nhử mồi tối đa trước khi cá sổng
+    icons:
+      red: "🔴"
+      green: "🟢"
+      timeout: "❌"
+
+  # 🐟 Cấu hình Minigame 3: Giữ Cá Trong Ô
+  keep-fish-game:
+    bar-length: 25           # Chiều dài của bể cá trên actionbar
+    basket-size: 5           # Độ rộng chiếc vợt [     ]
+    gravity-ticks: 2         # Cứ sau bao nhiêu tick thì chiếc vợt tự tụt về bên trái
+    jump-strength: 3         # Số ô chiếc vợt sẽ nhảy sang phải khi click chuột phải
+    fish-move-ticks: 8       # Tốc độ đổi vị trí bơi của con cá (số càng nhỏ cá bơi càng nhanh/khó)
+    win-progress-target: 100 # Điểm tiến trình để chiến thắng (đạt 100% là thắng)
+    progress-gain: 4         # Điểm cộng thêm mỗi tick khi cá nằm trong vợt
+    progress-loss: 5         # Điểm bị trừ mỗi tick khi cá bơi ra ngoài vợt
+
+  # ⚡ Cấu hình Minigame 4: Đua Tốc Độ Click (Spam Click)
+  click-speed-game:
+    time-limit-seconds: 3.6  # Thời gian giới hạn tối đa để hoàn thành (giây, có thể chỉnh 2.4, 3.6, v.v.)
+    min-clicks: 18           # Số lần click tối thiểu yêu cầu (ngẫu nhiên)
+    max-clicks: 25           # Số lần click tối đa yêu cầu (ngẫu nhiên)
+
+messages:
+  prefix: "&b[CauCa] &r"
+  reload-success: "&aĐã tải lại cấu hình thành công!"
+  no-permission: "&cBạn không có quyền thực hiện lệnh này!"
