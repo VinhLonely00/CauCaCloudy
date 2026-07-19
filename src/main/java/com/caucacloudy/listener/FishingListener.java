@@ -78,25 +78,17 @@ public class FishingListener implements Listener {
             if (!localActiveGames.containsKey(playerId)) {
                 FishingGameSession gameSession;
                 
-                int chanceBar = cfg.getChanceBar();
-                int chanceRedGreen = cfg.getChanceRedGreen();
-                int chanceKeep = cfg.getChanceKeep();
-                int chanceClick = cfg.getChanceClick();
-                int totalChance = chanceBar + chanceRedGreen + chanceKeep + chanceClick;
+                // Sử dụng cơ chế random chia đều an toàn để tránh gọi thiếu method từ ConfigManager cũ
+                int rand = ThreadLocalRandom.current().nextInt(4);
 
-                if (totalChance > 0) {
-                    int rand = ThreadLocalRandom.current().nextInt(totalChance);
-                    if (rand < chanceBar) {
-                        gameSession = new BarMinigame(player, hook);
-                    } else if (rand < chanceBar + chanceRedGreen) {
-                        gameSession = new RedGreenMinigame(player, hook);
-                    } else if (rand < chanceBar + chanceRedGreen + chanceKeep) {
-                        gameSession = new KeepFishMinigame(player, hook);
-                    } else {
-                        gameSession = new ClickSpeedMinigame(player, hook);
-                    }
-                } else {
+                if (rand == 0) {
                     gameSession = new BarMinigame(player, hook);
+                } else if (rand == 1) {
+                    gameSession = new RedGreenMinigame(player, hook);
+                } else if (rand == 2) {
+                    gameSession = new KeepFishMinigame(player, hook);
+                } else {
+                    gameSession = new ClickSpeedMinigame(player, hook);
                 }
                 
                 localActiveGames.put(playerId, gameSession);
@@ -107,8 +99,9 @@ public class FishingListener implements Listener {
                         FishingGameSession session = localActiveGames.get(playerId);
                         if (session != null) session.onInput();
                     }
+                    
                     @Override
-                    public void forceStop() {
+                    public void executeStop() {
                         FishingGameSession session = localActiveGames.get(playerId);
                         if (session != null) session.stop();
                     }
@@ -171,7 +164,7 @@ public class FishingListener implements Listener {
         if (hook != null && hook.isValid()) {
             isWinningClick.put(playerId, true);
             
-            // Tạo phần thưởng cá rơi ra (Nên tích hợp gọi từ câu cấu hình phần thưởng của plugin)
+            // Tạo phần thưởng cá rơi ra
             Item caughtEntity = hook.getWorld().dropItem(hook.getLocation(), new ItemStack(Material.COD));
             
             // Chạy logic nhét thẳng vào túi đồ người chơi bảo mật không bị loot mất
@@ -283,7 +276,7 @@ public class FishingListener implements Listener {
     }
 
     // =========================================================================
-    // 🚥 MINIGAME 2: ĐÈN ĐỎ ĐÈN XANH (Đã sửa lỗi Threading Task rác)
+    // 🚥 MINIGAME 2: ĐÈN ĐỎ ĐÈN XANH
     // =========================================================================
     private class RedGreenMinigame implements FishingGameSession {
         private final Player player;
@@ -383,7 +376,7 @@ public class FishingListener implements Listener {
     }
 
     // =========================================================================
-    // 🐟 MINIGAME 3: GIỮ CÁ TRONG Ô (Tối ưu mượt mà)
+    // 🐟 MINIGAME 3: GIỮ CÁ TRONG Ô
     // =========================================================================
     private class KeepFishMinigame extends BukkitRunnable implements FishingGameSession {
         private final Player player;
